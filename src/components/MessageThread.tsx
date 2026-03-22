@@ -4,6 +4,8 @@ import { useState, useRef, useEffect } from "react";
 import { Conversation, DirectMessage } from "@/lib/types";
 import { CURRENT_USER } from "@/lib/mock-data";
 import { formatDistanceToNow } from "@/lib/utils";
+import Toast from "@/components/ui/Toast";
+import { addSimulatedMessage } from "@/lib/client-simulation";
 
 interface Props {
   initialConversation: Conversation;
@@ -13,6 +15,7 @@ export default function MessageThread({ initialConversation }: Props) {
   const [messages, setMessages] = useState(initialConversation.messages);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
+  const [toastOpen, setToastOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -35,10 +38,12 @@ export default function MessageThread({ initialConversation }: Props) {
     setText("");
     setSending(true);
 
-    // TODO: Change the URL below to your real backend endpoint.
-    // Example: fetch("https://your-api.com/messages", { method: "POST", ... })
-
-    setSending(false);
+    try {
+      addSimulatedMessage(initialConversation.id, optimistic);
+      setToastOpen(true);
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -82,9 +87,6 @@ export default function MessageThread({ initialConversation }: Props) {
 
       {/* Input */}
       <form onSubmit={handleSend} className="flex items-center gap-3 px-4 py-3 border-t border-gray-200">
-        {/* TODO: Add a file picker here for media messages.
-            After picking a file, upload it with UploadThing and pass the returned URL
-            as `mediaUrl` in the fetch body above. */}
         <input
           type="text"
           value={text}
@@ -100,6 +102,12 @@ export default function MessageThread({ initialConversation }: Props) {
           {sending ? "…" : "Send"}
         </button>
       </form>
+
+      <Toast
+        open={toastOpen}
+        message="message enviado con exito"
+        onClose={() => setToastOpen(false)}
+      />
     </div>
   );
 }

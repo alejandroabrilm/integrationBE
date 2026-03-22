@@ -2,6 +2,8 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Toast from "@/components/ui/Toast";
+import { addSimulatedPost, addSimulatedReel, getCurrentUserSnapshot } from "@/lib/client-simulation";
 
 type Tab = "post" | "reel";
 
@@ -14,20 +16,16 @@ export default function CreatePage() {
   const [audioTrack, setAudioTrack] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    // Show a local preview so the user can see what they picked
-    setPreview(URL.createObjectURL(file));
 
-    // TODO: Upload the file to UploadThing here and save the returned URL.
-    // 1. Install: npm install uploadthing @uploadthing/react
-    // 2. Create your file router at /src/app/api/uploadthing/core.ts
-    // 3. Upload and save the URL:
-    //      const [result] = await uploadFiles("imageUploader", { files: [file] });
-    //      setUploadedUrl(result.url);
+    setPreview(URL.createObjectURL(file));
+    setError(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -38,28 +36,46 @@ export default function CreatePage() {
     setError(null);
 
     try {
+      const author = getCurrentUserSnapshot();
+      const createdAt = new Date().toISOString();
+
       if (tab === "post") {
-        // TODO: Replace `preview` with the real URL returned by UploadThing after upload.
-        // TODO: Change the URL below to your real backend endpoint.
-        // Example: fetch("https://your-api.com/posts", { method: "POST", ... })
-        await fetch("/api/posts", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ imageUrl: preview, caption, location }),
+        addSimulatedPost({
+          id: `post_local_${Date.now()}`,
+          author,
+          imageUrl: preview,
+          caption,
+          location,
+          likesCount: 0,
+          commentsCount: 0,
+          createdAt,
+          comments: [],
+          isLiked: false,
+          isSaved: false,
         });
+        setToastMessage("post creado con exito");
       } else {
-        // TODO: Replace `preview` with the real URL returned by UploadThing after upload.
-        // TODO: Change the URL below to your real backend endpoint.
-        // Example: fetch("https://your-api.com/reels", { method: "POST", ... })
-        await fetch("/api/reels", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ videoUrl: preview, thumbnailUrl: preview, caption, audioTrack }),
+        addSimulatedReel({
+          id: `reel_local_${Date.now()}`,
+          author,
+          videoUrl: preview,
+          thumbnailUrl: preview,
+          caption,
+          audioTrack,
+          likesCount: 0,
+          commentsCount: 0,
+          viewsCount: 0,
+          createdAt,
+          isLiked: false,
         });
+        setToastMessage("reel creado con exito");
       }
 
-      router.push("/");
-      router.refresh();
+      setToastOpen(true);
+      window.setTimeout(() => {
+        router.push(tab === "post" ? "/" : "/reels");
+        router.refresh();
+      }, 700);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -108,7 +124,6 @@ export default function CreatePage() {
               <p className="text-xs">
                 {tab === "post" ? "JPEG, PNG, WEBP" : "MP4, MOV"}
               </p>
-              {/* TODO: Replace this area with <UploadDropzone> from @uploadthing/react */}
             </div>
           )}
         </div>
@@ -169,6 +184,12 @@ export default function CreatePage() {
           {loading ? "Sharing…" : `Share ${tab}`}
         </button>
       </form>
+
+      <Toast
+        open={toastOpen}
+        message={toastMessage}
+        onClose={() => setToastOpen(false)}
+      />
     </div>
   );
 }

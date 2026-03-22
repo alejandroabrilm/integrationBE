@@ -1,22 +1,65 @@
 "use client";
 
-// Stories bar — purely visual mock. Students can wire it to a real stories API.
-// TODO (students): Fetch real stories from your backend endpoint (e.g. GET /api/stories)
+import { useEffect, useState } from "react";
+import { getSuggestions } from "@/lib/api";
+import { getCurrentUserSnapshot } from "@/lib/client-simulation";
 
-const MOCK_STORIES = [
-  { username: "yourhandle", seed: "current", isOwn: true },
-  { username: "alex.photo", seed: "alex", isOwn: false },
-  { username: "maya.art", seed: "maya", isOwn: false },
-  { username: "javier.cooks", seed: "javier", isOwn: false },
-  { username: "sofia.travels", seed: "sofia", isOwn: false },
-  { username: "kai.fitness", seed: "kai", isOwn: false },
-];
+interface StoryItem {
+  id: string;
+  username: string;
+  avatar: string;
+  isOwn: boolean;
+}
 
 export default function StoriesBar() {
+  const [stories, setStories] = useState<StoryItem[]>([
+    {
+      id: "current-user",
+      username: getCurrentUserSnapshot().username,
+      avatar: getCurrentUserSnapshot().avatar,
+      isOwn: true,
+    },
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStories() {
+      try {
+        const currentUser = getCurrentUserSnapshot();
+        const suggestions = await getSuggestions();
+        if (cancelled) return;
+
+        setStories([
+          {
+            id: currentUser.id,
+            username: currentUser.username,
+            avatar: currentUser.avatar,
+            isOwn: true,
+          },
+          ...suggestions.map((user) => ({
+            id: user.id,
+            username: user.username,
+            avatar: user.avatar,
+            isOwn: false,
+          })),
+        ]);
+      } catch {
+        // Keep the static own-story fallback if suggestions fail.
+      }
+    }
+
+    void loadStories();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <div className="flex gap-4 overflow-x-auto pb-2 scrollbar-hide bg-white border border-gray-200 rounded-xl px-4 py-3">
-      {MOCK_STORIES.map(({ username, seed, isOwn }) => (
-        <button key={username} className="flex flex-col items-center gap-1 flex-shrink-0">
+      {stories.map(({ id, username, avatar, isOwn }) => (
+        <button key={id} className="flex flex-col items-center gap-1 flex-shrink-0">
           <div
             className={`w-14 h-14 rounded-full p-0.5 ${
               isOwn ? "bg-gray-200" : "bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600"
@@ -25,7 +68,7 @@ export default function StoriesBar() {
             <div className="w-full h-full rounded-full border-2 border-white overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`https://api.dicebear.com/8.x/notionists/svg?seed=${seed}`}
+                src={avatar}
                 alt={username}
                 className="w-full h-full object-cover"
               />

@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { Post } from "@/lib/types";
 import { formatDistanceToNow } from "@/lib/utils";
+import Toast from "@/components/ui/Toast";
+import { getCurrentUserSnapshot } from "@/lib/client-simulation";
 
 interface Props {
   post: Post;
@@ -12,26 +14,47 @@ interface Props {
 export default function PostCard({ post: initial }: Props) {
   const [post, setPost] = useState(initial);
   const [showAllComments, setShowAllComments] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
 
   async function handleLike() {
-    // Optimistic update
     setPost((p) => ({
       ...p,
       isLiked: !p.isLiked,
       likesCount: p.isLiked ? p.likesCount - 1 : p.likesCount + 1,
     }));
-
-    // TODO: Change the URL below to your real backend endpoint.
-    // Example: fetch(`https://your-api.com/posts/${post.id}/like`, { method: "POST" })
+    setToastMessage("post actualizado con exito");
+    setToastOpen(true);
   }
 
   async function handleSave() {
-    // Optimistic update
     setPost((p) => ({ ...p, isSaved: !p.isSaved }));
+    setToastMessage("post guardado con exito");
+    setToastOpen(true);
+  }
 
-    // TODO: Change the URL below to your real backend endpoint.
-    // Example: fetch(`https://your-api.com/posts/${post.id}/save`, { method: "POST" })
-    await fetch(`/api/posts/${post.id}/save`, { method: "POST" });
+  function handleCommentSubmit() {
+    if (!commentText.trim()) return;
+
+    const author = getCurrentUserSnapshot();
+    const nextComment = {
+      id: `comment_local_${Date.now()}`,
+      author,
+      text: commentText.trim(),
+      createdAt: new Date().toISOString(),
+      likesCount: 0,
+    };
+
+    setPost((current) => ({
+      ...current,
+      comments: [...current.comments, nextComment],
+      commentsCount: current.commentsCount + 1,
+    }));
+    setCommentText("");
+    setShowAllComments(true);
+    setToastMessage("comentario creado con exito");
+    setToastOpen(true);
   }
 
   return (
@@ -136,22 +159,31 @@ export default function PostCard({ post: initial }: Props) {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-5 h-5 flex-shrink-0 text-gray-400">
           <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM9.75 9.75c0 .414-.168.75-.375.75S9 10.164 9 9.75 9.168 9 9.375 9s.375.336.375.75zm-.375 0h.008v.015h-.008V9.75zm5.625 0c0 .414-.168.75-.375.75s-.375-.336-.375-.75.168-.75.375-.75.375.336.375.75zm-.375 0h.008v.015h-.008V9.75z" />
         </svg>
-        {/* TODO: Create a POST /api/posts/[id]/comments endpoint, then wire it here.
-            Example:
-              await fetch(`/api/posts/${post.id}/comments`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text: commentText }),
-              }); */}
         <input
           type="text"
           placeholder="Add a comment…"
+          value={commentText}
+          onChange={(e) => setCommentText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleCommentSubmit();
+          }}
           className="flex-1 text-sm outline-none bg-transparent"
         />
-        <button className="text-sm font-semibold text-blue-500 opacity-40" disabled>
+        <button
+          type="button"
+          onClick={handleCommentSubmit}
+          className="text-sm font-semibold text-blue-500 disabled:opacity-40"
+          disabled={!commentText.trim()}
+        >
           Post
         </button>
       </div>
+
+      <Toast
+        open={toastOpen}
+        message={toastMessage}
+        onClose={() => setToastOpen(false)}
+      />
     </article>
   );
 }

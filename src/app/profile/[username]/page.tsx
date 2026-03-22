@@ -5,23 +5,74 @@ import { useParams } from "next/navigation";
 import { User, Post } from "@/lib/types";
 import { CURRENT_USER } from "@/lib/mock-data";
 import Link from "next/link";
+import ProfileGrid from "@/components/ProfileGrid";
+import Toast from "@/components/ui/Toast";
+import { getProfile } from "@/lib/api";
+import { getCurrentUserSnapshot, mergeSimulatedPosts } from "@/lib/client-simulation";
 
 export default function ProfilePage() {
   const { username } = useParams<{ username: string }>();
   const [user, setUser] = useState<User | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
 
   useEffect(() => {
-    // TODO: Change the URL below to your real backend endpoint.
-    // Example: fetch(`https://your-api.com/profile/${username}`)
+    let cancelled = false;
 
+    async function loadProfile() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await getProfile(username);
+        if (cancelled) return;
+
+        const ownProfile = username === CURRENT_USER.username;
+        setUser(ownProfile ? getCurrentUserSnapshot() : response.user);
+        setPosts(ownProfile ? mergeSimulatedPosts(response.posts) : response.posts);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : "No se pudo cargar el perfil.");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void loadProfile();
+
+    return () => {
+      cancelled = true;
+    };
   }, [username]);
 
   if (loading) return <div className="flex justify-center py-20 text-gray-400">Loading profile…</div>;
+  if (error) return <div className="flex justify-center py-20 text-gray-400">{error}</div>;
   if (!user) return <div className="flex justify-center py-20 text-gray-400">User not found.</div>;
 
   const isOwn = username === CURRENT_USER.username;
+  const postsCount = posts.length > 0 ? posts.length : user.postsCount;
+
+  function handleFollow() {
+    setIsFollowing((previous) => {
+      const next = !previous;
+      setUser((current) =>
+        current
+          ? {
+              ...current,
+              followersCount: Math.max(0, current.followersCount + (next ? 1 : -1)),
+            }
+          : current
+      );
+      setToastMessage(next ? "usuario seguido con exito" : "usuario actualizado con exito");
+      setToastOpen(true);
+      return next;
+    });
+  }
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
@@ -50,9 +101,16 @@ export default function ProfilePage() {
               </Link>
             ) : (
               <>
-                {/* TODO: Wire to POST /api/profile/[username]/follow */}
-                <button className="px-6 py-1.5 text-sm font-semibold bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
-                  Follow
+                <button
+                  type="button"
+                  onClick={handleFollow}
+                  className={`px-6 py-1.5 text-sm font-semibold rounded-lg transition-colors ${
+                    isFollowing
+                      ? "bg-gray-100 text-gray-900 hover:bg-gray-200"
+                      : "bg-blue-500 text-white hover:bg-blue-600"
+                  }`}
+                >
+                  {isFollowing ? "Following" : "Follow"}
                 </button>
                 <Link href="/messages" className="px-4 py-1.5 text-sm font-semibold bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
                   Message
@@ -63,16 +121,14 @@ export default function ProfilePage() {
 
           <div className="flex gap-6 mb-4">
             <div>
-              <span className="font-semibold">{user.postsCount.toLocaleString()}</span>
+              <span className="font-semibold">{postsCount.toLocaleString()}</span>
               <span className="text-sm text-gray-500 ml-1">posts</span>
             </div>
-            <button className="hover:opacity-70">
-              {/* TODO: fetch("/api/profile/[username]/followers") */}
+            <button type="button" className="hover:opacity-70">
               <span className="font-semibold">{user.followersCount.toLocaleString()}</span>
               <span className="text-sm text-gray-500 ml-1">followers</span>
             </button>
-            <button className="hover:opacity-70">
-              {/* TODO: fetch("/api/profile/[username]/following") */}
+            <button type="button" className="hover:opacity-70">
               <span className="font-semibold">{user.followingCount.toLocaleString()}</span>
               <span className="text-sm text-gray-500 ml-1">following</span>
             </button>
@@ -98,15 +154,14 @@ export default function ProfilePage() {
           </svg>
           Posts
         </button>
-        {/* TODO: fetch(`/api/profile/${username}/reels`) on tab click */}
-        <button className="flex items-center gap-1.5 py-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
+        <button type="button" className="flex items-center gap-1.5 py-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-4 h-4">
             <path strokeLinecap="round" strokeLinejoin="round" d="M3.375 9h17.25c1.035 0 1.875.84 1.875 1.875v9.75c0 1.036-.84 1.875-1.875 1.875H3.375A1.875 1.875 0 011.5 20.625v-9.75C1.5 9.839 2.34 9 3.375 9z" />
           </svg>
           Reels
         </button>
         {isOwn && (
-          <button className="flex items-center gap-1.5 py-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
+          <button type="button" className="flex items-center gap-1.5 py-3 text-xs font-semibold uppercase tracking-widest text-gray-400">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="w-4 h-4">
               <path strokeLinecap="round" strokeLinejoin="round" d="M17.593 3.322c1.1.128 1.907 1.077 1.907 2.185V21L12 17.25 4.5 21V5.507c0-1.108.806-2.057 1.907-2.185a48.507 48.507 0 0111.186 0z" />
             </svg>
@@ -115,18 +170,13 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {/* TODO (students): Render the posts grid here.
-           `posts` is an array of Post objects fetched above.
-           Each post has: id, imageUrl, caption, likesCount, commentsCount, author.
-           Display them in a 3-column grid (use grid grid-cols-3 gap-0.5).
-           Each cell should be aspect-square with the post image filling it.
-           Optionally show a hover overlay with likes/comments counts. */}
-      <div className="flex flex-col items-center gap-3 py-16 text-gray-400">
-        <p className="font-semibold text-lg">Posts grid coming soon</p>
-        <p className="text-sm text-center max-w-xs">
-          Implement the posts grid in <code className="bg-gray-100 px-1 rounded text-gray-600">src/app/profile/[username]/page.tsx</code>
-        </p>
-      </div>
+      <ProfileGrid posts={posts} />
+
+      <Toast
+        open={toastOpen}
+        message={toastMessage}
+        onClose={() => setToastOpen(false)}
+      />
     </div>
   );
 }

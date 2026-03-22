@@ -2,16 +2,19 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { CURRENT_USER } from "@/lib/mock-data";
+import Toast from "@/components/ui/Toast";
+import { getCurrentUserSnapshot, saveCurrentUserProfile } from "@/lib/client-simulation";
 
 export default function EditProfilePage() {
   const router = useRouter();
-  const [name, setName] = useState(CURRENT_USER.name);
-  const [bio, setBio] = useState(CURRENT_USER.bio);
-  const [website, setWebsite] = useState(CURRENT_USER.website ?? "");
-  const [avatarPreview, setAvatarPreview] = useState(CURRENT_USER.avatar);
+  const currentUser = getCurrentUserSnapshot();
+  const [name, setName] = useState(currentUser.name);
+  const [bio, setBio] = useState(currentUser.bio);
+  const [website, setWebsite] = useState(currentUser.website ?? "");
+  const [avatarPreview, setAvatarPreview] = useState(currentUser.avatar);
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [toastOpen, setToastOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -19,29 +22,19 @@ export default function EditProfilePage() {
     if (!file) return;
     setAvatarPreview(URL.createObjectURL(file));
 
-    // TODO: Upload the avatar with UploadThing and save the returned URL.
-    // Example:
-    //   const [result] = await uploadFiles("imageUploader", { files: [file] });
-    //   setUploadedAvatarUrl(result.url);
+    // UploadThing is optional in this project; for now the preview is local only.
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
 
-    // TODO: Replace the URL below with your real backend endpoint.
-    // Also pass `avatarUrl` from UploadThing once you integrate file uploads.
-    // Example: fetch("https://your-api.com/profile", { method: "POST", ... })
-    await fetch("/api/profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, bio, website }),
-    });
-
+    saveCurrentUserProfile({ name, bio, website, avatar: avatarPreview });
     setSaved(true);
+    setToastOpen(true);
     setLoading(false);
     setTimeout(() => {
-      router.push(`/profile/${CURRENT_USER.username}`);
+      router.push(`/profile/${currentUser.username}`);
       router.refresh();
     }, 800);
   }
@@ -114,6 +107,12 @@ export default function EditProfilePage() {
           {saved ? "Saved ✓" : loading ? "Saving…" : "Save changes"}
         </button>
       </form>
+
+      <Toast
+        open={toastOpen}
+        message="usuario actualizado con exito"
+        onClose={() => setToastOpen(false)}
+      />
     </div>
   );
 }

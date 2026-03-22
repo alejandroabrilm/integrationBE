@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Reel } from "@/lib/types";
 import { formatDistanceToNow } from "@/lib/utils";
+import Toast from "@/components/ui/Toast";
 
 interface Props {
   reel: Reel;
@@ -12,12 +13,15 @@ interface Props {
 export default function ReelCard({ reel }: Props) {
   const [isLiked, setIsLiked] = useState(reel.isLiked);
   const [likesCount, setLikesCount] = useState(reel.likesCount);
+  const [toastOpen, setToastOpen] = useState(false);
 
   function handleLike() {
-    setIsLiked((v) => !v);
-    setLikesCount((v) => (isLiked ? v - 1 : v + 1));
-    // TODO (students): Call your real backend endpoint to like/unlike this reel
-    // Example: await fetch(`/api/reels/${reel.id}/like`, { method: "POST" })
+    setIsLiked((previous) => {
+      const next = !previous;
+      setLikesCount((count) => count + (next ? 1 : -1));
+      return next;
+    });
+    setToastOpen(true);
   }
 
   return (
@@ -95,6 +99,12 @@ export default function ReelCard({ reel }: Props) {
         )}
         <p className="text-white/60 text-xs mt-1">{reel.viewsCount.toLocaleString()} views</p>
       </div>
+
+      <Toast
+        open={toastOpen}
+        message="reel actualizado con exito"
+        onClose={() => setToastOpen(false)}
+      />
     </div>
   );
 }
